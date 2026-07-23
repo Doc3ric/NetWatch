@@ -1,0 +1,19 @@
+{
+  "name": "netwatch",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "agent",
+    "backend",
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "agent": "npm run dev --workspace=agent",
+    "backend": "npm run dev --workspace=backend",
+    "web": "npm run dev --workspace=web"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
