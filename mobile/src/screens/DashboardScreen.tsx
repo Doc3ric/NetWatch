@@ -16,6 +16,7 @@ export default function DashboardScreen({ navigation }: any) {
     devices: [],
     alerts: []
   });
+  const [isTesting, setIsTesting] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -53,6 +54,7 @@ export default function DashboardScreen({ navigation }: any) {
     
     const handleUpdate = (update: any) => {
       if (update.type === 'speedtest_result') {
+        setIsTesting(false);
         setData((prev: any) => {
           const newMetrics = [...prev.metrics];
           if (newMetrics.length > 0) {
@@ -124,7 +126,29 @@ export default function DashboardScreen({ navigation }: any) {
 
       {/* Performance */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>CURRENT PERFORMANCE</Text>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>CURRENT PERFORMANCE</Text>
+          <TouchableOpacity 
+            onPress={async () => {
+              if (isTesting) return;
+              setIsTesting(true);
+              const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+              await fetch(`${backendUrl}/api/speedtest/trigger`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+              }).catch((err) => {
+                console.error(err);
+                setIsTesting(false);
+              });
+            }}
+            disabled={isTesting}
+            style={[styles.testButton, isTesting && styles.testButtonDisabled]}
+          >
+            <Text style={[styles.testButtonText, isTesting && styles.testButtonTextDisabled]}>
+              {isTesting ? 'Running...' : 'Run Speed Test'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.perfGrid}>
           <View style={styles.perfItem}>
             <Activity color="#94A3B8" size={16} />
@@ -265,6 +289,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  testButton: {
+    backgroundColor: '#00C89615',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  testButtonDisabled: {
+    backgroundColor: '#2A3441',
+  },
+  testButtonText: {
+    color: '#00C896',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  testButtonTextDisabled: {
+    color: '#94A3B8',
   },
   linkText: {
     color: '#00C896',

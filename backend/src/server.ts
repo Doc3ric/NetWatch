@@ -4,6 +4,7 @@ import 'dotenv/config';
 import { initDb } from './db/index.js';
 import { ingestRoutes } from './routes/ingest.js';
 import { apiRoutes } from './routes/api.js';
+import { pushRoutes } from './routes/push.js';
 import { startRetentionJob } from './retention.js';
 import { Server } from 'socket.io';
 
@@ -53,6 +54,7 @@ fastify.register(cors, {
 // Register routes
 fastify.register(ingestRoutes);
 fastify.register(apiRoutes, { prefix: '/api' });
+fastify.register(pushRoutes);
 
 // Start server
 const start = async () => {

@@ -66,4 +66,13 @@ export function setupSchema(db: Database) {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_alerts_resolved ON alerts(resolved);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_alerts_deviceId ON alerts(deviceId);`);
+
+  // ── Device Tokens Table ──────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS device_tokens (
+      token TEXT PRIMARY KEY,
+      platform TEXT,
+      registeredAt TEXT NOT NULL
+    );
+  `);
 }

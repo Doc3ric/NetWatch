@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "297450349347",
+    "project_id": "netwatch-e9134",
+    "storage_bucket": "netwatch-e9134.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:297450349347:android:6f3520c3fb027f128ae296",
+        "android_client_info": {
+          "package_name": "com.reykkkkk.netwatch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7E_QgKac6yp2J0f4Q-YA53dfM2-auVBU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

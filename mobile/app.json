@@ -1,7 +1,13 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "netwatch",
+    "owner": "reykkkkk",
+    "extra": {
+      "eas": {
+        "projectId": "fd65bad5-5c0e-43b9-aac8-f5c7b394d1ce"
+      }
+    },
+    "slug": "netwatch",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,6 +16,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.reykkkkk.netwatch",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

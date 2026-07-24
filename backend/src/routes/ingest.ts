@@ -142,6 +142,43 @@ export async function ingestRoutes(fastify: FastifyInstance) {
       for (const alert of generatedAlerts) {
         insertAlert.run(alert);
       }
+
+      // Send Push Notifications for new alerts
+      if (generatedAlerts.length > 0) {
+        const tokens = db.prepare(`SELECT token FROM device_tokens`).all() as { token: string }[];
+        if (tokens.length > 0) {
+          const messages = generatedAlerts.map(alert => ({
+            to: tokens.map(t => t.token),
+            sound: 'default',
+            title: `NetWatch Alert: ${alert.severity.toUpperCase()}`,
+            body: alert.message,
+            data: { alertId: alert.id },
+          }));
+
+          fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Accept-encoding': 'gzip, deflate',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(messages),
+          }).then(async (res) => {
+            const data = await res.json();
+            // Handle Expo push ticket errors (e.g., DeviceNotRegistered)
+            if (data?.data) {
+              data.data.forEach((ticket: any, index: number) => {
+                if (ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') {
+                  const badToken = tokens[index]?.token; // this assumes mapping, but for simplicity Expo might collapse it if we send an array of tokens in `to`.
+                  // Actually, Expo push sends an array of receipts matching the `to` array if messages are flattened.
+                  // For robust cleanup, we just log it for now or delete all if any are bad, but let's just log it here for MVP
+                  fastify.log.warn(`Push ticket error: ${ticket.message}`);
+                }
+              });
+            }
+          }).catch(err => fastify.log.error(err, 'Failed to send push notification'));
+        }
+      }
       
       return { metric: metricObj, newAlerts: generatedAlerts };
     });
