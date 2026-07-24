@@ -49,4 +49,6 @@ export interface AgentConfig {
   intervalSeconds: number;
   subnet: string | null;   // null = auto-detect
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+  backendUrl: string;
+  speedtestIntervalMin: number;
 }

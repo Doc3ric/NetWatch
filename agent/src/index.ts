@@ -9,6 +9,8 @@ import { discoverHosts } from './scanner/arp.js';
 import { pingHosts } from './scanner/ping.js';
 import { lookupVendors } from './scanner/oui.js';
 import { inferDeviceType } from './scanner/deviceType.js';
+import { runSpeedTest } from './speedtest.js';
+import { io } from 'socket.io-client';
 import type { Device, ScanResult } from './types.js';
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -21,6 +23,7 @@ logger.info('  NetWatch Agent  v0.1.0 — Phase 1');
 logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 logger.info(`  Polling interval : ${config.intervalSeconds}s`);
 logger.info(`  Subnet (config)  : ${config.subnet ?? '(auto-detect)'}`);
+logger.info(`  Backend URL      : ${config.backendUrl}`);
 logger.info(`  Log level        : ${config.logLevel}`);
 logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
@@ -137,6 +140,57 @@ function printSnapshot(result: ScanResult): void {
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
 
+async function postSnapshot(result: ScanResult): Promise<void> {
+  try {
+    const res = await fetch(`${config.backendUrl}/ingest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(result),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      logger.warn(`[backend] Failed to post snapshot: ${res.status} ${res.statusText} - ${text}`);
+    } else {
+      logger.debug(`[backend] Snapshot posted successfully`);
+    }
+  } catch (err: any) {
+    logger.warn(`[backend] Error posting snapshot to ${config.backendUrl}: ${err.message}`);
+  }
+}
+
+async function postSpeedTestResult(result: { downloadMbps: number, uploadMbps: number }): Promise<void> {
+  try {
+    const res = await fetch(`${config.backendUrl}/api/speedtest/result`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(result),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      logger.warn(`[backend] Failed to post speedtest result: ${res.status} - ${text}`);
+    } else {
+      logger.debug(`[backend] Speedtest result posted successfully`);
+    }
+  } catch (err: any) {
+    logger.warn(`[backend] Error posting speedtest result: ${err.message}`);
+  }
+}
+
+async function executeSpeedTestCycle() {
+  try {
+    const result = await runSpeedTest();
+    await postSpeedTestResult(result);
+  } catch (err) {
+    logger.error('Scheduled speed test failed', err);
+  }
+}
+
 async function main(): Promise<void> {
   // Resolve subnet: use config or auto-detect
   const subnet = config.subnet ?? detectSubnet();
@@ -146,6 +200,7 @@ async function main(): Promise<void> {
   try {
     const result = await runScan(subnet);
     printSnapshot(result);
+    await postSnapshot(result);
   } catch (err) {
     logger.error('Scan failed', err);
   }
@@ -155,10 +210,24 @@ async function main(): Promise<void> {
     try {
       const result = await runScan(subnet);
       printSnapshot(result);
+      await postSnapshot(result);
     } catch (err) {
       logger.error('Scan cycle failed', err);
     }
   }, config.intervalSeconds * 1000);
+
+  // Speed test schedule
+  setInterval(executeSpeedTestCycle, config.speedtestIntervalMin * 60 * 1000);
+
+  // Socket.io for on-demand triggers
+  const socket = io(config.backendUrl.replace('/api', ''));
+  socket.on('connect', () => {
+    logger.info(`[socket] Connected to backend for triggers`);
+  });
+  socket.on('speedtest:trigger', () => {
+    logger.info(`[socket] Received on-demand speed test trigger!`);
+    executeSpeedTestCycle();
+  });
 }
 
 // Handle graceful shutdown

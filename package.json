@@ -11,7 +11,8 @@
   "scripts": {
     "agent": "npm run dev --workspace=agent",
     "backend": "npm run dev --workspace=backend",
-    "web": "npm run dev --workspace=web"
+    "web": "npm run dev --workspace=web",
+    "build": "npm run build --workspaces --if-present"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

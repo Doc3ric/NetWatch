@@ -12,10 +12,13 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "mac-oui-lookup": "^1.1.4",
+    "socket.io-client": "^4.8.3",
+    "speedtest-net": "^2.2.0",
     "xml2js": "^0.6.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
+    "@types/speedtest-net": "^2.1.5",
     "@types/xml2js": "^0.4.14",
     "tsx": "^4.15.6",
     "typescript": "^5.4.5"
