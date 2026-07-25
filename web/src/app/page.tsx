@@ -443,10 +443,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="h-48 w-full">
-            {data.metrics.filter((m: any) => m.downloadMbps !== null).length === 0 ? (
+            {data.metrics.filter((m: any) => typeof m.downloadMbps === 'number').length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-text-muted">
                 <Activity className="w-8 h-8 mb-2 opacity-50" />
-                <span className="text-sm">No data yet — click Run Speed Test</span>
+                <span className="text-sm">No speed tests in this time range</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -461,7 +461,7 @@ export default function Dashboard() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#151A22', borderColor: '#2A3441', color: '#E2E8F0' }}
                   />
-                  <Area type="monotone" dataKey="downloadMbps" stroke="#00C896" fillOpacity={1} fill="url(#colorDl)" />
+                  <Area type="monotone" dataKey="downloadMbps" stroke="#00C896" fillOpacity={1} fill="url(#colorDl)" connectNulls={true} dot={{ r: 3, fill: '#00C896', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
