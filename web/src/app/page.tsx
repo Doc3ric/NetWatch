@@ -129,8 +129,17 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-        const [statusRes, metricsRes, devicesRes, alertsRes] = await Promise.all([
-          fetch(`${backendUrl}/api/status`, { credentials: 'include' }).then(res => res.json()),
+        
+        // Fetch status first to check auth before doing parallel requests
+        const statusCheck = await fetch(`${backendUrl}/api/status`, { credentials: 'include' });
+        if (statusCheck.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        
+        const statusRes = await statusCheck.json();
+        
+        const [metricsRes, devicesRes, alertsRes] = await Promise.all([
           fetch(`${backendUrl}/api/metrics?range=${timeRange}`, { credentials: 'include' }).then(res => res.json()),
           fetch(`${backendUrl}/api/devices`, { credentials: 'include' }).then(res => res.json()),
           fetch(`${backendUrl}/api/alerts?resolved=false`, { credentials: 'include' }).then(res => res.json())
@@ -138,9 +147,9 @@ export default function Dashboard() {
         
         setData({
           status: statusRes,
-          metrics: metricsRes.reverse(), // Ensure oldest first for recharts
-          devices: devicesRes,
-          alerts: alertsRes
+          metrics: Array.isArray(metricsRes) ? metricsRes.reverse() : [], // Ensure oldest first for recharts
+          devices: Array.isArray(devicesRes) ? devicesRes : [],
+          alerts: Array.isArray(alertsRes) ? alertsRes : []
         });
         setLastUpdated(new Date());
       } catch (err) {

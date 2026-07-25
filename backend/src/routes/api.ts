@@ -214,7 +214,7 @@ export async function apiRoutes(fastify: FastifyInstance) {
   // POST /api/speedtest/result - Save agent speed test result
   fastify.post('/speedtest/result', async (request, reply) => {
     const db = fastify.db;
-    const { downloadMbps, uploadMbps } = request.body as any;
+    const { pingMs, downloadMbps, uploadMbps } = request.body as any;
 
     if (downloadMbps === undefined || uploadMbps === undefined) {
       return reply.code(400).send({ error: 'Missing bandwidth data' });
@@ -224,20 +224,20 @@ export async function apiRoutes(fastify: FastifyInstance) {
     const latest = db.prepare(`SELECT id FROM metrics ORDER BY timestamp DESC LIMIT 1`).get() as { id: string } | undefined;
     
     if (latest) {
-      db.prepare(`UPDATE metrics SET downloadMbps = ?, uploadMbps = ? WHERE id = ?`).run(downloadMbps, uploadMbps, latest.id);
+      db.prepare(`UPDATE metrics SET pingMs = ?, downloadMbps = ?, uploadMbps = ? WHERE id = ?`).run(pingMs || null, downloadMbps, uploadMbps, latest.id);
     } else {
       const crypto = require('crypto');
       db.prepare(`
-        INSERT INTO metrics (id, timestamp, downloadMbps, uploadMbps)
-        VALUES (?, ?, ?, ?)
-      `).run(crypto.randomUUID(), new Date().toISOString(), downloadMbps, uploadMbps);
+        INSERT INTO metrics (id, timestamp, pingMs, downloadMbps, uploadMbps)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(crypto.randomUUID(), new Date().toISOString(), pingMs || null, downloadMbps, uploadMbps);
     }
 
     // Broadcast update so frontend bandwidth chart refreshes
     fastify.io.emit('network:update', {
       type: 'speedtest_result',
       timestamp: new Date().toISOString(),
-      metrics: { downloadMbps, uploadMbps }
+      metrics: { pingMs: pingMs || 0, downloadMbps, uploadMbps }
     });
 
     return { success: true };
