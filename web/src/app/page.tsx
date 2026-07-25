@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX } from 'lucide-react';
+import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const FlashingValue = ({ value, children }: { value: any, children: React.ReactNode }) => {
@@ -35,6 +35,28 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [timeAgo, setTimeAgo] = useState<string>('just now');
+  const [toast, setToast] = useState<{ message: string, visible: boolean } | null>(null);
+
+  const showToast = (message: string) => {
+    setToast({ message, visible: true });
+    setTimeout(() => setToast({ message, visible: false }), 3000);
+  };
+
+  const handleResolveAlert = async (id: string) => {
+    if (!window.confirm('Mark this alert as resolved?')) return;
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+      await fetch(`${backendUrl}/api/alerts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolved: true })
+      });
+      setData((prev: any) => ({ ...prev, alerts: prev.alerts.filter((a: any) => a.id !== id) }));
+      showToast('Alert resolved');
+    } catch (err) {
+      console.error('Failed to resolve alert', err);
+    }
+  };
 
   // Time Ago Updater
   useEffect(() => {
@@ -481,18 +503,27 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold tracking-wider text-text-muted uppercase mb-4">Recent Alerts</h2>
             <div className="space-y-4">
               {data.alerts.slice(0,3).map((alert: any) => (
-                <div key={alert.id} className="flex gap-3">
-                  <div className="mt-0.5">
-                    {alert.type === 'new_device' ? (
-                      <Activity className="w-4 h-4 text-primary" />
+                <div key={alert.id} className="flex gap-3 group items-start">
+                  <div className="mt-0.5 shrink-0">
+                    {alert.type === 'new_device' || alert.severity === 'info' ? (
+                      <Info className="w-4 h-4 text-blue-400" />
+                    ) : alert.severity === 'critical' ? (
+                      <AlertOctagon className="w-4 h-4 text-danger" />
                     ) : (
-                      <AlertTriangle className={`w-4 h-4 ${alert.severity === 'critical' ? 'text-danger' : 'text-orange-400'}`} />
+                      <AlertTriangle className="w-4 h-4 text-orange-400" />
                     )}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm text-text leading-snug">{alert.message}</p>
                     <p className="text-xs text-text-muted mt-1">{new Date(alert.timestamp).toLocaleTimeString()}</p>
                   </div>
+                  <button 
+                    onClick={() => handleResolveAlert(alert.id)}
+                    title="Mark Resolved"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-primary shrink-0"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
               {data.alerts.length === 0 && (
@@ -507,6 +538,14 @@ export default function Dashboard() {
         </div>
       </div>
       
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 bg-surface border border-border text-text px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-opacity duration-300 ${toast.visible ? 'opacity-100' : 'opacity-0'}`}>
+          <CheckCircle2 className="w-5 h-5 text-primary" />
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
+
     </div>
   );
 }
