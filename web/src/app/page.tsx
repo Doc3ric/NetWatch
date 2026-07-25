@@ -2,9 +2,20 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon, Edit2, Check, X } from 'lucide-react';
+import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon, Edit2, Check, X, Smartphone, Tv, Cpu, HelpCircle } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useSearchParams } from 'next/navigation';
+
+const getDeviceIcon = (type: string, className: string) => {
+  switch (type?.toLowerCase()) {
+    case 'router': return <Router className={className} />;
+    case 'laptop': case 'desktop': return <Laptop className={className} />;
+    case 'phone': return <Smartphone className={className} />;
+    case 'tv': return <Tv className={className} />;
+    case 'iot': return <Cpu className={className} />;
+    default: return <HelpCircle className={className} />;
+  }
+};
 
 const FlashingValue = ({ value, children }: { value: any, children: React.ReactNode }) => {
   const [flash, setFlash] = useState(false);
@@ -480,7 +491,7 @@ export default function Dashboard() {
                   <tr key={device.id} className="hover:bg-surface-hover/80 transition-colors group">
                     <td className="px-2 py-3">
                       <div className="flex items-center gap-3 text-text">
-                        {device.type === 'router' ? <Router className="w-4 h-4 text-text-muted shrink-0" /> : <Laptop className="w-4 h-4 text-text-muted shrink-0" />}
+                        {getDeviceIcon(device.type, "w-4 h-4 text-text-muted shrink-0")}
                         {editingDeviceId === device.id ? (
                           <div className="flex items-center gap-2">
                             <input 
@@ -554,8 +565,8 @@ export default function Dashboard() {
               <div className="absolute top-1/2 left-0 w-full h-px bg-border -z-10"></div>
               
               <div className="flex flex-col items-center bg-surface p-2">
-                <div className="w-10 h-10 rounded-lg border border-primary/30 bg-primary/10 flex items-center justify-center mb-2">
-                  <Globe2 className="w-5 h-5 text-primary" />
+                <div className={`w-10 h-10 rounded-lg border flex items-center justify-center mb-2 ${isConnected ? 'border-primary/30 bg-primary/10' : 'border-danger/30 bg-danger/10'}`}>
+                  <Globe2 className={`w-5 h-5 ${isConnected ? 'text-primary' : 'text-danger'}`} />
                 </div>
                 <span className="text-xs font-semibold text-text-muted uppercase">WAN</span>
               </div>

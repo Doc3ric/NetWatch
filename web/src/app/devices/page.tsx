@@ -2,10 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { Laptop, Router, Search, Filter } from 'lucide-react';
+import { Laptop, Router, Search, Filter, Smartphone, Tv, Cpu, HelpCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+
+const getDeviceIcon = (type: string, className: string) => {
+  switch (type?.toLowerCase()) {
+    case 'router': return <Router className={className} />;
+    case 'laptop': case 'desktop': return <Laptop className={className} />;
+    case 'phone': return <Smartphone className={className} />;
+    case 'tv': return <Tv className={className} />;
+    case 'iot': return <Cpu className={className} />;
+    default: return <HelpCircle className={className} />;
+  }
+};
 
 export default function DevicesPage() {
   const { socket } = useSocket();
@@ -96,7 +107,7 @@ export default function DevicesPage() {
                 <td className="px-6 py-4">
                   <Link href={`/devices/${device.id}`} className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center group-hover:border-primary/50 transition-colors">
-                      {device.type === 'router' ? <Router className="w-5 h-5 text-text-muted group-hover:text-primary transition-colors" /> : <Laptop className="w-5 h-5 text-text-muted group-hover:text-primary transition-colors" />}
+                      {getDeviceIcon(device.type, "w-5 h-5 text-text-muted group-hover:text-primary transition-colors")}
                     </div>
                     <div>
                       <p className="font-semibold text-text group-hover:text-primary transition-colors">{device.name || device.vendor}</p>
