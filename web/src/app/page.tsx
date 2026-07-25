@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
 import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon, Edit2, Check, X, Smartphone, Tv, Cpu, Circle } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { formatDistanceToNow } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
 
 const getDeviceIcon = (type: string, className: string) => {
@@ -212,6 +213,7 @@ export default function Dashboard() {
   const dlMin = dlStats.length ? Math.min(...dlStats.map((m: any) => m.downloadMbps)) : 0;
   const dlMax = dlStats.length ? Math.max(...dlStats.map((m: any) => m.downloadMbps)) : 0;
   const dlAvg = dlStats.length ? dlStats.reduce((a: any, b: any) => a + b.downloadMbps, 0) / dlStats.length : 0;
+  const latestSpeedTest = dlStats.length > 0 ? dlStats[dlStats.length - 1] : null;
 
   if (isLoading) {
     return (
@@ -388,13 +390,19 @@ export default function Dashboard() {
             </div>
             <div className="flex flex-col">
               <div className="text-primary mb-2"><ArrowDownRight className="w-4 h-4" /></div>
-              <p className="text-sm text-text-muted mb-1">Download</p>
-              <p className="text-xl font-semibold text-primary"><FlashingValue value={latestMetric?.downloadMbps}>{latestMetric?.downloadMbps ? latestMetric.downloadMbps.toFixed(1) : '--'}</FlashingValue> Mbps</p>
+              <div className="flex items-baseline gap-2 mb-1">
+                <p className="text-sm text-text-muted">Download</p>
+                {latestSpeedTest && <span className="text-[10px] text-text-muted/70">{formatDistanceToNow(new Date(latestSpeedTest.timestamp), { addSuffix: true })}</span>}
+              </div>
+              <p className="text-xl font-semibold text-primary"><FlashingValue value={latestSpeedTest?.downloadMbps}>{latestSpeedTest?.downloadMbps ? latestSpeedTest.downloadMbps.toFixed(1) : '--'}</FlashingValue> Mbps</p>
             </div>
             <div className="flex flex-col">
               <div className="text-primary mb-2"><ArrowUpRight className="w-4 h-4" /></div>
-              <p className="text-sm text-text-muted mb-1">Upload</p>
-              <p className="text-xl font-semibold text-primary"><FlashingValue value={latestMetric?.uploadMbps}>{latestMetric?.uploadMbps ? latestMetric.uploadMbps.toFixed(1) : '--'}</FlashingValue> Mbps</p>
+              <div className="flex items-baseline gap-2 mb-1">
+                <p className="text-sm text-text-muted">Upload</p>
+                {latestSpeedTest && <span className="text-[10px] text-text-muted/70">{formatDistanceToNow(new Date(latestSpeedTest.timestamp), { addSuffix: true })}</span>}
+              </div>
+              <p className="text-xl font-semibold text-primary"><FlashingValue value={latestSpeedTest?.uploadMbps}>{latestSpeedTest?.uploadMbps ? latestSpeedTest.uploadMbps.toFixed(1) : '--'}</FlashingValue> Mbps</p>
             </div>
             <div className="flex flex-col">
               <div className="text-danger mb-2"><AlertTriangle className="w-4 h-4" /></div>
@@ -484,7 +492,17 @@ export default function Dashboard() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#151A22', borderColor: '#2A3441', color: '#E2E8F0' }}
                   />
-                  <Area type="monotone" dataKey="downloadMbps" stroke="#00C896" fillOpacity={1} fill="url(#colorDl)" connectNulls={true} dot={{ r: 3, fill: '#00C896', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                  <Area 
+                    type={dlStats.length < 4 ? "linear" : "monotone"} 
+                    dataKey="downloadMbps" 
+                    stroke="#00C896" 
+                    strokeDasharray={dlStats.length < 4 ? "3 3" : "0"}
+                    fillOpacity={dlStats.length < 4 ? 0 : 1} 
+                    fill="url(#colorDl)" 
+                    connectNulls={true} 
+                    dot={{ r: 3, fill: '#00C896', strokeWidth: 0 }} 
+                    activeDot={{ r: 5 }} 
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             )}
