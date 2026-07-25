@@ -26,6 +26,26 @@ export async function apiRoutes(fastify: FastifyInstance) {
     return devices;
   });
 
+  // PATCH /api/devices/:id - Rename a device
+  fastify.patch('/devices/:id', async (request, reply) => {
+    const db = fastify.db;
+    const { id } = request.params as { id: string };
+    const schema = z.object({ name: z.string().min(1) });
+    
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid body' });
+    }
+
+    const { name } = parsed.data;
+    const info = db.prepare(`UPDATE devices SET name = ? WHERE id = ?`).run(name, id);
+    if (info.changes === 0) {
+      return reply.code(404).send({ error: 'Device not found' });
+    }
+    
+    return { success: true };
+  });
+
   // GET /api/metrics - Recent metrics history with downsampling
   fastify.get('/metrics', async (request, reply) => {
     const db = fastify.db;

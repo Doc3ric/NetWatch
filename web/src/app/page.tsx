@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon } from 'lucide-react';
+import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon, Edit2, Check, X } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const FlashingValue = ({ value, children }: { value: any, children: React.ReactNode }) => {
@@ -36,6 +36,10 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [timeAgo, setTimeAgo] = useState<string>('just now');
   const [toast, setToast] = useState<{ message: string, visible: boolean } | null>(null);
+  
+  // Inline editing state
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [editingDeviceName, setEditingDeviceName] = useState('');
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
@@ -56,6 +60,39 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Failed to resolve alert', err);
     }
+  };
+
+  const startEditing = (device: any) => {
+    setEditingDeviceId(device.id);
+    setEditingDeviceName(device.name || device.vendor || '');
+  };
+
+  const saveEditing = async (id: string) => {
+    if (!editingDeviceName.trim()) {
+      setEditingDeviceId(null);
+      return;
+    }
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+      await fetch(`${backendUrl}/api/devices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingDeviceName })
+      });
+      setData((prev: any) => ({
+        ...prev,
+        devices: prev.devices.map((d: any) => d.id === id ? { ...d, name: editingDeviceName } : d)
+      }));
+      setEditingDeviceId(null);
+      showToast('Device renamed');
+    } catch (err) {
+      console.error('Failed to rename device', err);
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingDeviceId(null);
+    setEditingDeviceName('');
   };
 
   // Time Ago Updater
@@ -439,11 +476,38 @@ export default function Dashboard() {
                   </tr>
                 )}
                 {data.devices.slice(0,5).map((device: any) => (
-                  <tr key={device.id} className="hover:bg-surface-hover/50 transition-colors">
+                  <tr key={device.id} className="hover:bg-surface-hover/80 transition-colors group">
                     <td className="px-2 py-3">
                       <div className="flex items-center gap-3 text-text">
-                        {device.type === 'router' ? <Router className="w-4 h-4 text-text-muted" /> : <Laptop className="w-4 h-4 text-text-muted" />}
-                        <span className="truncate max-w-[120px]">{device.vendor || device.name}</span>
+                        {device.type === 'router' ? <Router className="w-4 h-4 text-text-muted shrink-0" /> : <Laptop className="w-4 h-4 text-text-muted shrink-0" />}
+                        {editingDeviceId === device.id ? (
+                          <div className="flex items-center gap-2">
+                            <input 
+                              autoFocus
+                              type="text" 
+                              value={editingDeviceName}
+                              onChange={(e) => setEditingDeviceName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveEditing(device.id);
+                                if (e.key === 'Escape') cancelEditing();
+                              }}
+                              className="bg-background border border-primary/50 text-xs rounded px-2 py-1 w-24 focus:outline-none focus:ring-1 focus:ring-primary text-text"
+                            />
+                            <button onClick={() => saveEditing(device.id)} className="text-primary hover:text-primary/80"><Check className="w-3.5 h-3.5" /></button>
+                            <button onClick={cancelEditing} className="text-text-muted hover:text-danger"><X className="w-3.5 h-3.5" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 max-w-[150px]">
+                            <span className="truncate">{device.name || device.vendor || device.ip}</span>
+                            <button 
+                              onClick={() => startEditing(device)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-primary shrink-0"
+                              title="Rename device"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-2 py-3 font-mono">{device.ip}</td>

@@ -45,7 +45,7 @@ export async function ingestRoutes(fastify: FastifyInstance) {
         INSERT INTO devices (id, name, mac, ip, vendor, status, firstSeen, lastSeen, type, lastPingMs)
         VALUES (@id, @name, @mac, @ip, @vendor, @status, @firstSeen, @lastSeen, @type, @lastPingMs)
         ON CONFLICT(id) DO UPDATE SET
-          name = excluded.name,
+          name = COALESCE(devices.name, excluded.name),
           ip = excluded.ip,
           vendor = excluded.vendor,
           status = excluded.status,
