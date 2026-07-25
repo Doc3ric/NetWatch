@@ -347,7 +347,7 @@ export default function Dashboard() {
             </button>
           </div>
           
-          <div className="grid grid-cols-4 gap-4 h-full">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 h-full">
             <div className="flex flex-col">
               <div className="text-text-muted mb-2"><Activity className="w-4 h-4" /></div>
               <p className="text-sm text-text-muted mb-1">Ping</p>
