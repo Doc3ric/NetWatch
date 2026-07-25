@@ -8,15 +8,50 @@ export async function apiRoutes(fastify: FastifyInstance) {
     const db = fastify.db;
     const totalDevices = db.prepare(`SELECT COUNT(*) as count FROM devices`).get() as { count: number };
     const onlineDevices = db.prepare(`SELECT COUNT(*) as count FROM devices WHERE status = 'online'`).get() as { count: number };
+    const settings = db.prepare(`SELECT pollingIntervalSec FROM settings WHERE id = 1`).get() as { pollingIntervalSec: number };
     
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
       network: {
         totalDevices: totalDevices.count,
-        onlineDevices: onlineDevices.count
+        onlineDevices: onlineDevices.count,
+        pollingIntervalSec: settings?.pollingIntervalSec || 30
       }
     };
+  });
+
+  // GET /api/settings - Get configuration settings
+  fastify.get('/settings', async (request, reply) => {
+    const db = fastify.db;
+    const settings = db.prepare(`SELECT * FROM settings WHERE id = 1`).get();
+    return settings;
+  });
+
+  // PATCH /api/settings - Update configuration settings
+  fastify.patch('/settings', async (request, reply) => {
+    const db = fastify.db;
+    const schema = z.object({
+      pollingIntervalSec: z.number().min(5).max(300).optional(),
+      latencyWarningMs: z.number().min(10).optional(),
+      latencyCriticalMs: z.number().min(10).optional(),
+      packetLossWarningPct: z.number().min(1).max(100).optional(),
+      subnetOverride: z.string().optional()
+    });
+    
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid body' });
+    }
+
+    const updates = parsed.data;
+    const fields = Object.keys(updates);
+    if (fields.length === 0) return { success: true };
+
+    const setClause = fields.map(f => `${f} = @${f}`).join(', ');
+    db.prepare(`UPDATE settings SET ${setClause} WHERE id = 1`).run(updates);
+    
+    return { success: true };
   });
 
   // GET /api/devices - List of known devices

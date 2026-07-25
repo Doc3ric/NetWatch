@@ -75,4 +75,19 @@ export function setupSchema(db: Database) {
       registeredAt TEXT NOT NULL
     );
   `);
+
+  // ── Settings Table ───────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      pollingIntervalSec INTEGER NOT NULL DEFAULT 30,
+      latencyWarningMs INTEGER NOT NULL DEFAULT 150,
+      latencyCriticalMs INTEGER NOT NULL DEFAULT 300,
+      packetLossWarningPct INTEGER NOT NULL DEFAULT 5,
+      subnetOverride TEXT
+    );
+  `);
+  
+  // Initialize default settings row if it doesn't exist
+  db.exec(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
 }

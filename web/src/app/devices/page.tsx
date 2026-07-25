@@ -5,11 +5,28 @@ import { useSocket } from '@/contexts/SocketContext';
 import { Laptop, Router, Search, Filter } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function DevicesPage() {
   const { socket } = useSocket();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [devices, setDevices] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('q') || '');
+
+  // Sync search from URL
+  useEffect(() => {
+    setSearch(searchParams.get('q') || '');
+  }, [searchParams]);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    if (val) {
+      router.replace(`/devices?q=${encodeURIComponent(val)}`);
+    } else {
+      router.replace('/devices');
+    }
+  };
 
   // Initial Fetch
   useEffect(() => {
@@ -52,7 +69,7 @@ export default function DevicesPage() {
               type="text" 
               placeholder="Search devices..." 
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
               className="bg-surface border border-border rounded-md pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-primary text-text w-64"
             />
           </div>

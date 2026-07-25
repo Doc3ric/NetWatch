@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
 import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon, Edit2, Check, X } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { useSearchParams } from 'next/navigation';
 
 const FlashingValue = ({ value, children }: { value: any, children: React.ReactNode }) => {
   const [flash, setFlash] = useState(false);
@@ -24,6 +25,9 @@ const FlashingValue = ({ value, children }: { value: any, children: React.ReactN
 
 export default function Dashboard() {
   const { socket, isConnected } = useSocket();
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get('q') || '';
+
   const [data, setData] = useState<any>({
     status: null,
     metrics: [],
@@ -465,17 +469,14 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {data.devices.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-2 py-8 text-center text-text-muted">
-                      <div className="flex flex-col items-center justify-center">
-                        <SearchX className="w-6 h-6 mb-2 opacity-50" />
-                        <span>No devices detected yet.</span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {data.devices.slice(0,5).map((device: any) => (
+                {data.devices
+                  .filter((d: any) => !searchQuery || 
+                    (d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                    (d.vendor && d.vendor.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                    (d.ip && d.ip.includes(searchQuery)) ||
+                    (d.mac && d.mac.toLowerCase().includes(searchQuery.toLowerCase()))
+                  )
+                  .slice(0,5).map((device: any) => (
                   <tr key={device.id} className="hover:bg-surface-hover/80 transition-colors group">
                     <td className="px-2 py-3">
                       <div className="flex items-center gap-3 text-text">
@@ -525,6 +526,19 @@ export default function Dashboard() {
                     <td className="px-2 py-3 text-right text-primary font-mono text-xs">-- GB</td>
                   </tr>
                 ))}
+                {data.devices.filter((d: any) => !searchQuery || 
+                    (d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                    (d.vendor && d.vendor.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                    (d.ip && d.ip.includes(searchQuery)) ||
+                    (d.mac && d.mac.toLowerCase().includes(searchQuery.toLowerCase()))
+                  ).length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-2 py-8 text-center text-text-muted">
+                      <SearchX className="w-8 h-8 mb-2 opacity-50 text-primary mx-auto" />
+                      <p className="text-sm">No devices found.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

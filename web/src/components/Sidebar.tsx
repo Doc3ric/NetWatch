@@ -12,12 +12,10 @@ const mainNav = [
   { name: 'Network Traffic', href: '/traffic', icon: Activity },
   { name: 'Speed Test', href: '/speed', icon: Gauge },
   { name: 'Alerts', href: '/alerts', icon: Bell },
-  { name: 'Reports', href: '/reports', icon: FileText },
 ];
 
 const bottomNav = [
   { name: 'Settings', href: '/settings', icon: Settings },
-  { name: 'User Profile', href: '/profile', icon: User },
 ];
 
 export function Sidebar() {

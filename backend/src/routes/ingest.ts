@@ -10,8 +10,10 @@ export async function ingestRoutes(fastify: FastifyInstance) {
     }
 
     const db = fastify.db;
-    const latencyThreshold = parseInt(process.env.NETWATCH_LATENCY_THRESHOLD_MS ?? '150', 10);
-    const packetLossThreshold = parseInt(process.env.NETWATCH_PACKET_LOSS_THRESHOLD_PCT ?? '5', 10);
+    const settings = db.prepare(`SELECT * FROM settings WHERE id = 1`).get() as any;
+    const latencyWarningMs = settings?.latencyWarningMs ?? parseInt(process.env.NETWATCH_LATENCY_THRESHOLD_MS ?? '150', 10);
+    const latencyCriticalMs = settings?.latencyCriticalMs ?? 300;
+    const packetLossWarningPct = settings?.packetLossWarningPct ?? parseInt(process.env.NETWATCH_PACKET_LOSS_THRESHOLD_PCT ?? '5', 10);
 
     const transaction = db.transaction(() => {
       const generatedAlerts: any[] = [];
@@ -83,8 +85,8 @@ export async function ingestRoutes(fastify: FastifyInstance) {
 
         // Per-device latency & packet loss alerts
         if (device.pingMs !== null && device.pingMs !== undefined) {
-          if (device.pingMs > latencyThreshold) {
-            const severity = device.pingMs > latencyThreshold * 2 ? 'critical' : 'warning';
+          if (device.pingMs > latencyWarningMs) {
+            const severity = device.pingMs >= latencyCriticalMs ? 'critical' : 'warning';
             // Deduplicate
             const existing = db.prepare(`SELECT severity FROM alerts WHERE type = 'high_latency' AND deviceId = ? AND resolved = 0 ORDER BY timestamp DESC LIMIT 1`).get(device.id) as { severity: string } | undefined;
             
@@ -101,8 +103,8 @@ export async function ingestRoutes(fastify: FastifyInstance) {
         }
 
         if (device.packetLossPct !== null && device.packetLossPct !== undefined) {
-          if (device.packetLossPct > packetLossThreshold) {
-            const severity = device.packetLossPct > packetLossThreshold * 2 ? 'critical' : 'warning';
+          if (device.packetLossPct > packetLossWarningPct) {
+            const severity = device.packetLossPct >= packetLossWarningPct * 2 ? 'critical' : 'warning';
             // Deduplicate
             const existing = db.prepare(`SELECT severity FROM alerts WHERE type = 'high_packet_loss' AND deviceId = ? AND resolved = 0 ORDER BY timestamp DESC LIMIT 1`).get(device.id) as { severity: string } | undefined;
             
