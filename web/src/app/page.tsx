@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2 } from 'lucide-react';
-import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX } from 'lucide-react';
+import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const FlashingValue = ({ value, children }: { value: any, children: React.ReactNode }) => {
   const [flash, setFlash] = useState(false);
@@ -319,7 +319,7 @@ export default function Dashboard() {
                 <button 
                   key={range}
                   onClick={() => setTimeRange(range)}
-                  className={`px-3 py-1 rounded ${timeRange === range ? 'bg-surface-hover text-text' : 'text-text-muted hover:text-text'}`}
+                  className={`px-3 py-1 rounded transition-colors ${timeRange === range ? 'bg-primary/20 text-primary shadow-sm border border-primary/30' : 'text-text-muted hover:text-text'}`}
                 >
                   {range}
                 </button>
@@ -336,10 +336,12 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2A3441" vertical={false} />
+                <ReferenceLine y={150} stroke="#FF5A5F" strokeDasharray="3 3" strokeOpacity={0.5} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#151A22', borderColor: '#2A3441', color: '#E2E8F0' }}
                   itemStyle={{ color: '#E2E8F0' }}
                   labelStyle={{ color: '#94A3B8' }}
+                  formatter={(value: number) => [`${Math.round(value)} ms`, 'Ping']}
                 />
                 <Area type="monotone" dataKey="pingMs" stroke="#94A3B8" fillOpacity={1} fill="url(#colorPing)" />
               </AreaChart>
@@ -356,21 +358,28 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="h-48 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.metrics}>
-                <defs>
-                  <linearGradient id="colorDl" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00C896" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#00C896" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2A3441" vertical={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#151A22', borderColor: '#2A3441', color: '#E2E8F0' }}
-                />
-                <Area type="monotone" dataKey="downloadMbps" stroke="#00C896" fillOpacity={1} fill="url(#colorDl)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {data.metrics.filter((m: any) => m.downloadMbps !== null).length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-text-muted">
+                <Activity className="w-8 h-8 mb-2 opacity-50" />
+                <span className="text-sm">No data yet — click Run Speed Test</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data.metrics}>
+                  <defs>
+                    <linearGradient id="colorDl" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00C896" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#00C896" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2A3441" vertical={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#151A22', borderColor: '#2A3441', color: '#E2E8F0' }}
+                  />
+                  <Area type="monotone" dataKey="downloadMbps" stroke="#00C896" fillOpacity={1} fill="url(#colorDl)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -397,6 +406,16 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
+                {data.devices.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-2 py-8 text-center text-text-muted">
+                      <div className="flex flex-col items-center justify-center">
+                        <SearchX className="w-6 h-6 mb-2 opacity-50" />
+                        <span>No devices detected yet.</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {data.devices.slice(0,5).map((device: any) => (
                   <tr key={device.id} className="hover:bg-surface-hover/50 transition-colors">
                     <td className="px-2 py-3">
@@ -477,7 +496,10 @@ export default function Dashboard() {
                 </div>
               ))}
               {data.alerts.length === 0 && (
-                <p className="text-sm text-text-muted">No unresolved alerts.</p>
+                <div className="flex flex-col items-center justify-center py-4 text-text-muted">
+                  <ShieldCheck className="w-8 h-8 mb-2 opacity-50 text-primary" />
+                  <p className="text-sm">No active alerts.</p>
+                </div>
               )}
             </div>
           </div>
