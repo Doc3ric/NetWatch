@@ -116,7 +116,7 @@ async function parseNmapXml(xml: string): Promise<DiscoveredHost[]> {
 async function parseArpTable(): Promise<DiscoveredHost[]> {
   try {
     logger.debug('[arp] Falling back to arp -a');
-    const { stdout } = await execAsync('arp -a', { timeout: 5000 });
+    const { stdout } = await execAsync('arp -a', { timeout: 5000, windowsHide: true });
     const entries: DiscoveredHost[] = [];
 
     for (const line of stdout.split('\n')) {

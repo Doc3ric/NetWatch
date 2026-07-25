@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -26,10 +27,14 @@ export default function RootLayout({
           
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <Header />
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <Header />
+            </React.Suspense>
             <main className="flex-1 overflow-y-auto p-6 bg-background">
               <div className="max-w-7xl mx-auto space-y-6">
-                {children}
+                <React.Suspense fallback={<div>Loading content...</div>}>
+                  {children}
+                </React.Suspense>
               </div>
             </main>
           </div>

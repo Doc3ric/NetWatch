@@ -417,7 +417,7 @@ export default function Dashboard() {
                   contentStyle={{ backgroundColor: '#151A22', borderColor: '#2A3441', color: '#E2E8F0' }}
                   itemStyle={{ color: '#E2E8F0' }}
                   labelStyle={{ color: '#94A3B8' }}
-                  formatter={(value: number) => [`${Math.round(value)} ms`, 'Ping']}
+                  formatter={(value: any) => [`${Math.round(value)} ms`, 'Ping']}
                 />
                 <Area type="monotone" dataKey="pingMs" stroke="#94A3B8" fillOpacity={1} fill="url(#colorPing)" />
               </AreaChart>
