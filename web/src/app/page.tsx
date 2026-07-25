@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon, Edit2, Check, X, Smartphone, Tv, Cpu, HelpCircle } from 'lucide-react';
+import { Activity, Globe2, Router, Laptop, MoreVertical, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2, ShieldCheck, SearchX, CheckCircle2, Info, AlertOctagon, Edit2, Check, X, Smartphone, Tv, Cpu, Circle } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useSearchParams } from 'next/navigation';
 
@@ -13,7 +13,7 @@ const getDeviceIcon = (type: string, className: string) => {
     case 'phone': return <Smartphone className={className} />;
     case 'tv': return <Tv className={className} />;
     case 'iot': return <Cpu className={className} />;
-    default: return <HelpCircle className={className} />;
+    default: return <Circle className={className} />;
   }
 };
 
@@ -201,6 +201,17 @@ export default function Dashboard() {
   }, [socket]);
 
   const latestMetric = data.metrics.length > 0 ? data.metrics[data.metrics.length - 1] : null;
+  const offlineDevicesCount = data.devices?.filter((d: any) => d.status !== 'online').length || 0;
+
+  const pingStats = data.metrics.filter((m: any) => typeof m.pingMs === 'number');
+  const pingMin = pingStats.length ? Math.min(...pingStats.map((m: any) => m.pingMs)) : 0;
+  const pingMax = pingStats.length ? Math.max(...pingStats.map((m: any) => m.pingMs)) : 0;
+  const pingAvg = pingStats.length ? pingStats.reduce((a: any, b: any) => a + b.pingMs, 0) / pingStats.length : 0;
+
+  const dlStats = data.metrics.filter((m: any) => typeof m.downloadMbps === 'number');
+  const dlMin = dlStats.length ? Math.min(...dlStats.map((m: any) => m.downloadMbps)) : 0;
+  const dlMax = dlStats.length ? Math.max(...dlStats.map((m: any) => m.downloadMbps)) : 0;
+  const dlAvg = dlStats.length ? dlStats.reduce((a: any, b: any) => a + b.downloadMbps, 0) / dlStats.length : 0;
 
   if (isLoading) {
     return (
@@ -388,7 +399,14 @@ export default function Dashboard() {
             <div className="flex flex-col">
               <div className="text-danger mb-2"><AlertTriangle className="w-4 h-4" /></div>
               <p className="text-sm text-text-muted mb-1">Packet Loss</p>
-              <p className="text-xl font-semibold"><FlashingValue value={latestMetric?.packetLossPct}>{latestMetric?.packetLossPct ? Math.round(latestMetric.packetLossPct) : '0'}</FlashingValue>%</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xl font-semibold"><FlashingValue value={latestMetric?.packetLossPct}>{latestMetric?.packetLossPct ? Math.round(latestMetric.packetLossPct) : '0'}</FlashingValue>%</p>
+                {latestMetric?.packetLossPct > 0 && offlineDevicesCount > 0 && (
+                  <span className="text-[10px] bg-danger/10 text-danger px-1.5 py-0.5 rounded leading-none whitespace-nowrap">
+                    {offlineDevicesCount} offline
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -432,6 +450,11 @@ export default function Dashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-border/50 text-xs text-text-muted">
+            <div>Min: <span className="text-text font-medium">{Math.round(pingMin)} ms</span></div>
+            <div>Avg: <span className="text-text font-medium">{Math.round(pingAvg)} ms</span></div>
+            <div>Max: <span className="text-text font-medium">{Math.round(pingMax)} ms</span></div>
+          </div>
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-6">
@@ -466,6 +489,11 @@ export default function Dashboard() {
               </ResponsiveContainer>
             )}
           </div>
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-border/50 text-xs text-text-muted">
+            <div>Min: <span className="text-text font-medium">{dlMin.toFixed(1)} Mbps</span></div>
+            <div>Avg: <span className="text-text font-medium">{dlAvg.toFixed(1)} Mbps</span></div>
+            <div>Max: <span className="text-text font-medium">{dlMax.toFixed(1)} Mbps</span></div>
+          </div>
         </div>
       </div>
 
@@ -487,7 +515,6 @@ export default function Dashboard() {
                   <th className="px-2 py-3 font-medium">IP Address</th>
                   <th className="px-2 py-3 font-medium">MAC</th>
                   <th className="px-2 py-3 font-medium">Status</th>
-                  <th className="px-2 py-3 font-medium text-right">Usage</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -545,7 +572,6 @@ export default function Dashboard() {
                         </FlashingValue>
                       </div>
                     </td>
-                    <td className="px-2 py-3 text-right text-primary font-mono text-xs">-- GB</td>
                   </tr>
                 ))}
                 {data.devices.filter((d: any) => !searchQuery || 
@@ -555,7 +581,7 @@ export default function Dashboard() {
                     (d.mac && d.mac.toLowerCase().includes(searchQuery.toLowerCase()))
                   ).length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-2 py-8 text-center text-text-muted">
+                    <td colSpan={4} className="px-2 py-8 text-center text-text-muted">
                       <SearchX className="w-8 h-8 mb-2 opacity-50 text-primary mx-auto" />
                       <p className="text-sm">No devices found.</p>
                     </td>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { Laptop, Router, Search, Filter, Smartphone, Tv, Cpu, HelpCircle } from 'lucide-react';
+import { Laptop, Router, Search, Filter, Smartphone, Tv, Cpu, Circle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,7 +14,7 @@ const getDeviceIcon = (type: string, className: string) => {
     case 'phone': return <Smartphone className={className} />;
     case 'tv': return <Tv className={className} />;
     case 'iot': return <Cpu className={className} />;
-    default: return <HelpCircle className={className} />;
+    default: return <Circle className={className} />;
   }
 };
 
