@@ -84,7 +84,8 @@ export function setupSchema(db: Database) {
       latencyWarningMs INTEGER NOT NULL DEFAULT 150,
       latencyCriticalMs INTEGER NOT NULL DEFAULT 300,
       packetLossWarningPct INTEGER NOT NULL DEFAULT 5,
-      subnetOverride TEXT
+      subnetOverride TEXT,
+      passwordHash TEXT
     );
   `);
   

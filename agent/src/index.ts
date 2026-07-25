@@ -146,6 +146,7 @@ async function postSnapshot(result: ScanResult): Promise<void> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-agent-secret': process.env.NETWATCH_AGENT_SECRET || 'fallback-agent-secret'
       },
       body: JSON.stringify(result),
     });
@@ -167,6 +168,7 @@ async function postSpeedTestResult(result: { downloadMbps: number, uploadMbps: n
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-agent-secret': process.env.NETWATCH_AGENT_SECRET || 'fallback-agent-secret'
       },
       body: JSON.stringify(result),
     });
@@ -220,7 +222,11 @@ async function main(): Promise<void> {
   setInterval(executeSpeedTestCycle, config.speedtestIntervalMin * 60 * 1000);
 
   // Socket.io for on-demand triggers
-  const socket = io(config.backendUrl.replace('/api', ''));
+  const socket = io(config.backendUrl.replace('/api', ''), {
+    auth: {
+      agentSecret: process.env.NETWATCH_AGENT_SECRET || 'fallback-agent-secret'
+    }
+  });
   socket.on('connect', () => {
     logger.info(`[socket] Connected to backend for triggers`);
   });

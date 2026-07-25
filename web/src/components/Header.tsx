@@ -34,7 +34,7 @@ export function Header() {
     const fetchAlerts = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-        const res = await fetch(`${backendUrl}/api/alerts?resolved=false`);
+        const res = await fetch(`${backendUrl}/api/alerts?resolved=false`, { credentials: 'include' });
         const data = await res.json();
         setAlerts(data);
       } catch (err) {

@@ -19,7 +19,7 @@ export default function SettingsPage() {
     const fetchSettings = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-        const res = await fetch(`${backendUrl}/api/settings`);
+        const res = await fetch(`${backendUrl}/api/settings`, { credentials: 'include' });
         const data = await res.json();
         setSettings(data);
       } catch (err) {
@@ -42,6 +42,7 @@ export default function SettingsPage() {
       await fetch(`${backendUrl}/api/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           pollingIntervalSec: parseInt(settings.pollingIntervalSec),
           latencyWarningMs: parseInt(settings.latencyWarningMs),

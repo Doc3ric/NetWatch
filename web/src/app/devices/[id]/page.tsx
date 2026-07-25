@@ -15,7 +15,7 @@ export default function DeviceDetailPage() {
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
     // For now, fetch all devices and find the one. Phase 8 can add a specific endpoint if needed.
-    fetch(`${backendUrl}/api/devices`)
+    fetch(`${backendUrl}/api/devices`, { credentials: 'include' })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();

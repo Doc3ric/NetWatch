@@ -19,7 +19,9 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-    const socketInstance = io(backendUrl);
+    const socketInstance = io(backendUrl, {
+      withCredentials: true
+    });
 
     socketInstance.on('connect', () => {
       setIsConnected(true);

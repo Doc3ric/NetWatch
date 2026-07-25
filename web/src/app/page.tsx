@@ -68,6 +68,7 @@ export default function Dashboard() {
       await fetch(`${backendUrl}/api/alerts/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ resolved: true })
       });
       setData((prev: any) => ({ ...prev, alerts: prev.alerts.filter((a: any) => a.id !== id) }));
@@ -92,6 +93,7 @@ export default function Dashboard() {
       await fetch(`${backendUrl}/api/devices/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name: editingDeviceName })
       });
       setData((prev: any) => ({
@@ -128,10 +130,10 @@ export default function Dashboard() {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
         const [statusRes, metricsRes, devicesRes, alertsRes] = await Promise.all([
-          fetch(`${backendUrl}/api/status`).then(res => res.json()),
-          fetch(`${backendUrl}/api/metrics?range=${timeRange}`).then(res => res.json()),
-          fetch(`${backendUrl}/api/devices`).then(res => res.json()),
-          fetch(`${backendUrl}/api/alerts?resolved=false`).then(res => res.json())
+          fetch(`${backendUrl}/api/status`, { credentials: 'include' }).then(res => res.json()),
+          fetch(`${backendUrl}/api/metrics?range=${timeRange}`, { credentials: 'include' }).then(res => res.json()),
+          fetch(`${backendUrl}/api/devices`, { credentials: 'include' }).then(res => res.json()),
+          fetch(`${backendUrl}/api/alerts?resolved=false`, { credentials: 'include' }).then(res => res.json())
         ]);
         
         setData({
@@ -348,7 +350,7 @@ export default function Dashboard() {
                 if (isTesting) return;
                 setIsTesting(true);
                 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-                await fetch(`${backendUrl}/api/speedtest/trigger`, { method: 'POST' });
+                await fetch(`${backendUrl}/api/speedtest/trigger`, { method: 'POST', credentials: 'include' });
               }}
               disabled={isTesting}
               className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-md transition-colors ${isTesting ? 'bg-surface-hover text-text-muted cursor-not-allowed' : 'bg-primary/10 text-primary hover:bg-primary/20'}`}

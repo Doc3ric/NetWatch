@@ -12,7 +12,7 @@ export default function AlertsPage() {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
       const url = filter === 'unresolved' ? `${backendUrl}/api/alerts?resolved=false` : `${backendUrl}/api/alerts`;
-      const res = await fetch(url);
+      const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setAlerts(data);
@@ -31,6 +31,7 @@ export default function AlertsPage() {
       const res = await fetch(`${backendUrl}/api/alerts/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ resolved: true })
       });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);

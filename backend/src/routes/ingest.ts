@@ -167,7 +167,7 @@ export async function ingestRoutes(fastify: FastifyInstance) {
             },
             body: JSON.stringify(messages),
           }).then(async (res) => {
-            const data = await res.json();
+            const data = (await res.json()) as any;
             // Handle Expo push ticket errors (e.g., DeviceNotRegistered)
             if (data?.data) {
               data.data.forEach((ticket: any, index: number) => {

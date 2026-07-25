@@ -1,8 +1,37 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 
 export async function apiRoutes(fastify: FastifyInstance) {
   
+  // POST /api/auth/login - Verify password and issue JWT token
+  fastify.post('/auth/login', async (request, reply) => {
+    const { password } = request.body as any;
+    if (!password) {
+      return reply.code(400).send({ error: 'Password is required' });
+    }
+    
+    const settings = fastify.db.prepare('SELECT passwordHash FROM settings WHERE id = 1').get() as any;
+    if (!settings || !settings.passwordHash) {
+      return reply.code(500).send({ error: 'System not configured properly' });
+    }
+    
+    const isValid = bcrypt.compareSync(password, settings.passwordHash);
+    if (!isValid) {
+      return reply.code(401).send({ error: 'Invalid password' });
+    }
+    
+    const token = fastify.jwt.sign({ role: 'admin' }, { expiresIn: '7d' });
+    reply.setCookie('token', token, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 // 7 days
+    });
+    
+    return reply.send({ success: true });
+  });
+
   // GET /api/status - Backend health and network summary
   fastify.get('/status', async (request, reply) => {
     const db = fastify.db;

@@ -42,7 +42,7 @@ export default function DevicesPage() {
   // Initial Fetch
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-    fetch(`${backendUrl}/api/devices`)
+    fetch(`${backendUrl}/api/devices`, { credentials: 'include' })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();
@@ -63,10 +63,10 @@ export default function DevicesPage() {
     };
   }, [socket]);
 
-  const filtered = devices.filter(d => 
+  const filtered = (devices || []).filter(d => 
     (d.name?.toLowerCase() || '').includes(search.toLowerCase()) || 
     (d.vendor?.toLowerCase() || '').includes(search.toLowerCase()) ||
-    d.ip.includes(search)
+    (d.ip || '').includes(search)
   );
 
   return (
