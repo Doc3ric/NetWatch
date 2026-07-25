@@ -12,7 +12,8 @@
     "agent": "npm run dev --workspace=agent",
     "backend": "npm run dev --workspace=backend",
     "web": "npm run dev --workspace=web",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "build:all": "npm run build --workspace=agent --workspace=backend --workspace=web"
   },
   "devDependencies": {
     "typescript": "^5.4.5"
