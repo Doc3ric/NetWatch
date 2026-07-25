@@ -37,7 +37,8 @@ export async function ingestRoutes(fastify: FastifyInstance) {
       for (const curr of currentOnline) {
         if (!incomingIds.has(curr.id)) {
           // Transitioned to offline
-          const deviceIdentifier = curr.name || curr.vendor || curr.ip || 'Unknown device';
+          const deviceName = curr.name || curr.vendor || 'Unknown';
+          const deviceIdentifier = `${curr.ip || 'Unknown IP'} (${deviceName})`;
           createAlert('device_offline', 'warning', `${deviceIdentifier} went offline`, curr.id);
           db.prepare(`UPDATE devices SET status = 'offline' WHERE id = ?`).run(curr.id);
         }

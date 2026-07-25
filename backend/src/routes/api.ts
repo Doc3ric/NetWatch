@@ -165,6 +165,14 @@ export async function apiRoutes(fastify: FastifyInstance) {
     }));
   });
 
+  // GET /api/alerts/summary - Returns alert counts
+  fastify.get('/alerts/summary', async (request, reply) => {
+    const db = fastify.db;
+    const unresolved = db.prepare(`SELECT COUNT(*) as count FROM alerts WHERE resolved = 0`).get() as { count: number };
+    const total = db.prepare(`SELECT COUNT(*) as count FROM alerts`).get() as { count: number };
+    return { unresolved: unresolved.count, total: total.count };
+  });
+
   // GET /api/alerts - Alerts list with optional filters
   fastify.get('/alerts', async (request, reply) => {
     const db = fastify.db;

@@ -7,10 +7,18 @@ import { formatDistanceToNow } from 'date-fns';
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'unresolved'>('unresolved');
+  const [counts, setCounts] = useState({ unresolved: 0, total: 0 });
 
   const fetchAlerts = async () => {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+      
+      const summaryRes = await fetch(`${backendUrl}/api/alerts/summary`, { credentials: 'include' });
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json();
+        setCounts(summaryData);
+      }
+
       const url = filter === 'unresolved' ? `${backendUrl}/api/alerts?resolved=false` : `${backendUrl}/api/alerts`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -50,20 +58,20 @@ export default function AlertsPage() {
             onClick={() => setFilter('unresolved')}
             className={`px-4 py-1.5 text-sm rounded-md transition-colors ${filter === 'unresolved' ? 'bg-surface-hover text-text font-medium' : 'text-text-muted hover:text-text'}`}
           >
-            Unresolved
+            Unresolved {counts.unresolved > 0 ? `(${counts.unresolved})` : ''}
           </button>
           <button 
             onClick={() => setFilter('all')}
             className={`px-4 py-1.5 text-sm rounded-md transition-colors ${filter === 'all' ? 'bg-surface-hover text-text font-medium' : 'text-text-muted hover:text-text'}`}
           >
-            All Alerts
+            All Alerts {counts.total > 0 ? `(${counts.total})` : ''}
           </button>
         </div>
       </div>
 
       <div className="space-y-4">
         {alerts.map(alert => (
-          <div key={alert.id} className={`bg-surface border rounded-xl p-5 flex gap-4 ${!alert.resolved ? 'border-l-4 border-l-danger border-border' : 'border-border opacity-70'}`}>
+          <div key={alert.id} className={`bg-surface border rounded-xl p-5 flex gap-4 ${!alert.resolved ? `border-l-4 border-border ${alert.severity === 'critical' ? 'border-l-danger' : alert.severity === 'warning' ? 'border-l-orange-500' : 'border-l-primary'}` : 'border-border opacity-70'}`}>
             <div className="mt-1">
               {alert.type === 'new_device' ? (
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
@@ -92,7 +100,7 @@ export default function AlertsPage() {
                       Mark Resolved
                     </button>
                   )}
-                  {alert.resolved && (
+                  {Boolean(alert.resolved) && (
                     <span className="mt-3 inline-block text-xs font-semibold text-primary uppercase tracking-wider">Resolved</span>
                   )}
                 </div>
