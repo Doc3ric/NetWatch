@@ -37,8 +37,11 @@ export async function ingestRoutes(fastify: FastifyInstance) {
       for (const curr of currentOnline) {
         if (!incomingIds.has(curr.id)) {
           // Transitioned to offline
-          const deviceName = curr.name || curr.vendor || 'Unknown';
-          const deviceIdentifier = `${curr.ip || 'Unknown IP'} (${deviceName})`;
+          const nameOrVendor = curr.name || curr.vendor || '';
+          let deviceIdentifier = curr.ip || 'Unknown IP';
+          if (nameOrVendor && nameOrVendor !== 'Unknown' && nameOrVendor !== curr.ip) {
+            deviceIdentifier += ` (${nameOrVendor})`;
+          }
           createAlert('device_offline', 'warning', `${deviceIdentifier} went offline`, curr.id);
           db.prepare(`UPDATE devices SET status = 'offline' WHERE id = ?`).run(curr.id);
         }
@@ -66,7 +69,12 @@ export async function ingestRoutes(fastify: FastifyInstance) {
         // Check if new device (MAC or ID doesn't exist)
         const exists = db.prepare(`SELECT id FROM devices WHERE id = ?`).get(device.id);
         if (!exists) {
-          createAlert('new_device', 'info', `New device discovered: ${device.ip} (${device.vendor || 'Unknown'})`, device.id);
+          const nameOrVendor = device.name || device.vendor || '';
+          let deviceIdentifier = device.ip || 'Unknown IP';
+          if (nameOrVendor && nameOrVendor !== 'Unknown' && nameOrVendor !== device.ip) {
+            deviceIdentifier += ` (${nameOrVendor})`;
+          }
+          createAlert('new_device', 'info', `New device discovered: ${deviceIdentifier}`, device.id);
         }
 
         const deviceData = {
