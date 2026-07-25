@@ -28,14 +28,15 @@ export async function ingestRoutes(fastify: FastifyInstance) {
       };
 
       // 1. Fetch current online devices
-      const currentOnline = db.prepare(`SELECT id, mac FROM devices WHERE status = 'online'`).all() as { id: string, mac: string }[];
+      const currentOnline = db.prepare(`SELECT id, name, vendor, ip FROM devices WHERE status = 'online'`).all() as { id: string, name: string | null, vendor: string | null, ip: string | null }[];
       const incomingIds = new Set(devices.map((d: any) => d.id));
 
       // Check for offline devices
       for (const curr of currentOnline) {
         if (!incomingIds.has(curr.id)) {
           // Transitioned to offline
-          createAlert('device_offline', 'warning', `Device went offline`, curr.id);
+          const deviceIdentifier = curr.name || curr.vendor || curr.ip || 'Unknown device';
+          createAlert('device_offline', 'warning', `${deviceIdentifier} went offline`, curr.id);
           db.prepare(`UPDATE devices SET status = 'offline' WHERE id = ?`).run(curr.id);
         }
       }
