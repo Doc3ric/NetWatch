@@ -26,6 +26,7 @@ export function setupSchema(db: Database) {
       id TEXT PRIMARY KEY,
       timestamp TEXT NOT NULL,
       pingMs REAL,
+      wanPingMs REAL,
       downloadMbps REAL,
       uploadMbps REAL,
       packetLossPct REAL

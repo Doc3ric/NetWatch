@@ -64,7 +64,7 @@ export default function SpeedTestPage() {
           const newMetric = {
             ...update.metrics,
             timestamp: update.timestamp || new Date().toISOString(),
-            pingMs: update.metrics.pingMs || 0
+            wanPingMs: update.metrics.wanPingMs || 0
           };
           const newMetrics = [newMetric, ...prev];
           return newMetrics;
@@ -132,7 +132,7 @@ export default function SpeedTestPage() {
         </div>
 
         <div className="flex flex-col md:flex-row gap-16 items-center w-full max-w-4xl justify-center my-8">
-          <CircularGauge label="PING" value={latest?.pingMs || 0} unit="ms" color="#94A3B8" max={100} icon={<Activity className="w-5 h-5" />} />
+          <CircularGauge label="PING" value={latest?.wanPingMs || 0} unit="ms" color="#94A3B8" max={100} icon={<Activity className="w-5 h-5" />} />
           <div className="flex flex-col items-center z-10 shrink-0">
              <button
                 onClick={triggerTest}
@@ -221,7 +221,7 @@ export default function SpeedTestPage() {
                   {metrics.slice(0, limit).map((m, i) => (
                     <tr key={i} className="hover:bg-surface-hover/50 transition-colors">
                       <td className="px-6 py-4 font-medium">{format(new Date(m.timestamp), 'MMM d, yyyy • HH:mm:ss')}</td>
-                      <td className="px-6 py-4 text-right">{Math.round(m.pingMs)} ms</td>
+                      <td className="px-6 py-4 text-right">{Math.round(m.wanPingMs)} ms</td>
                       <td className="px-6 py-4 text-right text-primary font-medium">{m.downloadMbps.toFixed(1)} Mbps</td>
                       <td className="px-6 py-4 text-right text-emerald-500 font-medium">{m.uploadMbps.toFixed(1)} Mbps</td>
                     </tr>

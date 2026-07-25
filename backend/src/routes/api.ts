@@ -142,6 +142,7 @@ export async function apiRoutes(fastify: FastifyInstance) {
       SELECT 
         ${bucketExpr} as bucketTimestamp,
         AVG(pingMs) as pingMs,
+        AVG(wanPingMs) as wanPingMs,
         AVG(downloadMbps) as downloadMbps,
         AVG(uploadMbps) as uploadMbps,
         AVG(packetLossPct) as packetLossPct
@@ -157,6 +158,7 @@ export async function apiRoutes(fastify: FastifyInstance) {
     return rows.map((r: any) => ({
       timestamp: r.bucketTimestamp,
       pingMs: r.pingMs,
+      wanPingMs: r.wanPingMs,
       downloadMbps: r.downloadMbps,
       uploadMbps: r.uploadMbps,
       packetLossPct: r.packetLossPct
@@ -224,11 +226,11 @@ export async function apiRoutes(fastify: FastifyInstance) {
     const latest = db.prepare(`SELECT id FROM metrics ORDER BY timestamp DESC LIMIT 1`).get() as { id: string } | undefined;
     
     if (latest) {
-      db.prepare(`UPDATE metrics SET pingMs = ?, downloadMbps = ?, uploadMbps = ? WHERE id = ?`).run(pingMs || null, downloadMbps, uploadMbps, latest.id);
+      db.prepare(`UPDATE metrics SET wanPingMs = ?, downloadMbps = ?, uploadMbps = ? WHERE id = ?`).run(pingMs || null, downloadMbps, uploadMbps, latest.id);
     } else {
       const crypto = require('crypto');
       db.prepare(`
-        INSERT INTO metrics (id, timestamp, pingMs, downloadMbps, uploadMbps)
+        INSERT INTO metrics (id, timestamp, wanPingMs, downloadMbps, uploadMbps)
         VALUES (?, ?, ?, ?, ?)
       `).run(crypto.randomUUID(), new Date().toISOString(), pingMs || null, downloadMbps, uploadMbps);
     }
@@ -237,7 +239,7 @@ export async function apiRoutes(fastify: FastifyInstance) {
     fastify.io.emit('network:update', {
       type: 'speedtest_result',
       timestamp: new Date().toISOString(),
-      metrics: { pingMs: pingMs || 0, downloadMbps, uploadMbps }
+      metrics: { wanPingMs: pingMs || 0, downloadMbps, uploadMbps }
     });
 
     return { success: true };
