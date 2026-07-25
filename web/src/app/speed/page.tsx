@@ -12,6 +12,7 @@ export default function SpeedTestPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [limit, setLimit] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function SpeedTestPage() {
         setIsTesting(false);
         if (timerRef.current) clearInterval(timerRef.current);
         setElapsedSeconds(0);
+        setErrorMsg(null);
         
         // Add new result to the top of the list, ensuring we have a timestamp
         setMetrics(prev => {
@@ -72,9 +74,20 @@ export default function SpeedTestPage() {
       }
     };
 
+    const handleError = (error: any) => {
+      if (error.type === 'speedtest_error') {
+        setIsTesting(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+        setElapsedSeconds(0);
+        setErrorMsg(`Speed test failed — ${error.message}`);
+      }
+    };
+
     socket.on('network:update', handleUpdate);
+    socket.on('network:error', handleError);
     return () => {
       socket.off('network:update', handleUpdate);
+      socket.off('network:error', handleError);
     };
   }, [socket]);
 
@@ -82,10 +95,20 @@ export default function SpeedTestPage() {
     if (isTesting) return;
     setIsTesting(true);
     setElapsedSeconds(0);
+    setErrorMsg(null);
     
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
+      setElapsedSeconds(prev => {
+        const next = prev + 1;
+        if (next > 60) {
+          clearInterval(timerRef.current!);
+          setIsTesting(false);
+          setErrorMsg('Speed test timed out — try again');
+          return 0;
+        }
+        return next;
+      });
     }, 1000);
 
     try {
@@ -95,6 +118,7 @@ export default function SpeedTestPage() {
       console.error('Failed to trigger speedtest:', err);
       setIsTesting(false);
       if (timerRef.current) clearInterval(timerRef.current);
+      setErrorMsg('Failed to trigger speed test');
     }
   };
 
@@ -155,7 +179,12 @@ export default function SpeedTestPage() {
                     <span className="font-bold text-lg">GO</span>
                   </>
                 )}
-             </button>
+              </button>
+             {errorMsg && (
+                <div className="absolute top-full mt-2 w-[300px] text-red-400 font-medium text-sm text-center bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">
+                  {errorMsg}
+                </div>
+             )}
           </div>
           <CircularGauge label="DOWNLOAD" value={latest?.downloadMbps || 0} unit="Mbps" color="#3B82F6" max={1000} icon={<ArrowDownRight className="w-5 h-5" />} />
           <CircularGauge label="UPLOAD" value={latest?.uploadMbps || 0} unit="Mbps" color="#10B981" max={1000} icon={<ArrowUpRight className="w-5 h-5" />} />

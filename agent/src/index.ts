@@ -184,12 +184,33 @@ async function postSpeedTestResult(result: { downloadMbps: number, uploadMbps: n
   }
 }
 
+async function postSpeedTestError(err: Error): Promise<void> {
+  try {
+    const res = await fetch(`${config.backendUrl}/api/speedtest/error`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-agent-secret': process.env.NETWATCH_AGENT_SECRET || 'fallback-agent-secret'
+      },
+      body: JSON.stringify({ message: err.message }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      logger.warn(`[backend] Failed to post speedtest error: ${res.status} - ${text}`);
+    }
+  } catch (e: any) {
+    logger.warn(`[backend] Error posting speedtest error: ${e.message}`);
+  }
+}
+
 async function executeSpeedTestCycle() {
   try {
     const result = await runSpeedTest();
     await postSpeedTestResult(result);
-  } catch (err) {
+  } catch (err: any) {
     logger.error('Scheduled speed test failed', err);
+    await postSpeedTestError(err);
   }
 }
 

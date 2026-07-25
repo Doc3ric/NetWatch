@@ -213,6 +213,19 @@ export async function apiRoutes(fastify: FastifyInstance) {
     return { success: true };
   });
 
+  // POST /api/speedtest/error - Handle speed test failure
+  fastify.post('/speedtest/error', async (request, reply) => {
+    const { message } = request.body as { message: string };
+    
+    // Broadcast the error to connected web clients
+    fastify.io.emit('network:error', {
+      type: 'speedtest_error',
+      message: message || 'Unknown error occurred during speed test'
+    });
+
+    return { success: true };
+  });
+
   // POST /api/speedtest/result - Save agent speed test result
   fastify.post('/speedtest/result', async (request, reply) => {
     const db = fastify.db;
