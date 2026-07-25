@@ -165,18 +165,31 @@ export async function apiRoutes(fastify: FastifyInstance) {
     }));
   });
 
-  // GET /api/alerts - Alerts list with optional resolved filter
+  // GET /api/alerts - Alerts list with optional filters
   fastify.get('/alerts', async (request, reply) => {
     const db = fastify.db;
-    const { resolved } = request.query as { resolved?: string };
+    const { resolved, days, type } = request.query as { resolved?: string, days?: string, type?: string };
     
-    let query = `SELECT * FROM alerts`;
+    let query = `SELECT * FROM alerts WHERE 1=1`;
     const params: any[] = [];
     
     if (resolved === 'false') {
-      query += ` WHERE resolved = 0`;
+      query += ` AND resolved = 0`;
     } else if (resolved === 'true') {
-      query += ` WHERE resolved = 1`;
+      query += ` AND resolved = 1`;
+    }
+
+    if (days && !isNaN(parseInt(days))) {
+      const ms = parseInt(days) * 24 * 60 * 60 * 1000;
+      const cutoff = new Date(Date.now() - ms).toISOString();
+      query += ` AND timestamp >= ?`;
+      params.push(cutoff);
+    }
+
+    if (type === 'device') {
+      query += ` AND type IN ('new_device', 'device_offline')`;
+    } else if (type === 'performance') {
+      query += ` AND type IN ('high_latency', 'high_packet_loss')`;
     }
     
     query += ` ORDER BY timestamp DESC`;

@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, MonitorSmartphone, Activity, Gauge, Bell, FileText, Settings, User } from 'lucide-react';
+import { LayoutDashboard, MonitorSmartphone, Activity, Gauge, Bell, FileText, Settings, User, List } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 const mainNav = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Devices', href: '/devices', icon: MonitorSmartphone },
-  { name: 'Network Traffic', href: '/traffic', icon: Activity },
+  { name: 'Activity Log', href: '/activity', icon: List },
   { name: 'Speed Test', href: '/speed', icon: Gauge },
   { name: 'Alerts', href: '/alerts', icon: Bell },
 ];
