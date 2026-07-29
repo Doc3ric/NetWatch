@@ -102,10 +102,24 @@ export async function apiRoutes(fastify: FastifyInstance) {
     }
 
     const { name } = parsed.data;
+    
+    // Fetch old name before updating (for activity event)
+    const before = db.prepare(`SELECT name FROM devices WHERE id = ?`).get(id) as { name: string } | undefined;
     const info = db.prepare(`UPDATE devices SET name = ? WHERE id = ?`).run(name, id);
     if (info.changes === 0) {
       return reply.code(404).send({ error: 'Device not found' });
     }
+    
+    // Emit activity event for the live feed
+    const crypto = require('crypto');
+    fastify.io.emit('activity:event', {
+      id: crypto.randomUUID(),
+      type: 'device_renamed',
+      timestamp: new Date().toISOString(),
+      deviceId: id,
+      message: `Device renamed: ${before?.name || id} → ${name}`,
+      meta: { oldName: before?.name || '', newName: name },
+    });
     
     return { success: true };
   });
@@ -270,12 +284,185 @@ export async function apiRoutes(fastify: FastifyInstance) {
     }
 
     // Broadcast update so frontend bandwidth chart refreshes
+    const nowIso = new Date().toISOString();
     fastify.io.emit('network:update', {
       type: 'speedtest_result',
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso,
       metrics: { wanPingMs: pingMs || 0, downloadMbps, uploadMbps }
+    });
+
+    // Emit activity event for the live feed
+    const cryptoMod = require('crypto');
+    fastify.io.emit('activity:event', {
+      id: cryptoMod.randomUUID(),
+      type: 'speedtest_result',
+      timestamp: nowIso,
+      message: `Speed test: ↓ ${downloadMbps.toFixed(1)} Mbps  ↑ ${uploadMbps.toFixed(1)} Mbps  ping ${Math.round(pingMs || 0)} ms`,
+      meta: { downloadMbps, uploadMbps, pingMs: pingMs || 0 },
     });
 
     return { success: true };
   });
+
+  // GET /api/devices/:id/uptime - 30-day uptime % for a single device
+  fastify.get('/devices/:id/uptime', async (request, reply) => {
+    const db = fastify.db;
+    const { id } = request.params as { id: string };
+    const { days = '30' } = request.query as { days?: string };
+    const windowDays = Math.min(Math.max(parseInt(days, 10) || 30, 1), 90);
+
+    const device = db.prepare(`SELECT id, status FROM devices WHERE id = ?`).get(id) as { id: string, status: string } | undefined;
+    if (!device) return reply.code(404).send({ error: 'Device not found' });
+
+    const windowStart = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    const windowMs = windowDays * 24 * 60 * 60 * 1000;
+    const now = new Date();
+
+    const rows = db.prepare(
+      `SELECT status, timestamp FROM device_status_history WHERE deviceId = ? AND timestamp >= ? ORDER BY timestamp ASC`
+    ).all(id, windowStart.toISOString()) as { status: string, timestamp: string }[];
+
+    // Reconstruct online intervals from transition events
+    let onlineMs = 0;
+    let lastOnline: Date | null = null;
+
+    for (const row of rows) {
+      const t = new Date(row.timestamp);
+      if (row.status === 'online') {
+        lastOnline = t;
+      } else if (row.status === 'offline' && lastOnline) {
+        onlineMs += t.getTime() - lastOnline.getTime();
+        lastOnline = null;
+      }
+    }
+    // If currently online and no closing offline event found
+    if (lastOnline && device.status === 'online') {
+      onlineMs += now.getTime() - lastOnline.getTime();
+    }
+
+    const uptimePct = rows.length === 0 ? null : Math.min(100, (onlineMs / windowMs) * 100);
+    return { uptimePct, onlineMs, windowMs, windowDays, hasHistory: rows.length > 0 };
+  });
+
+  // GET /api/heatmap - Per-device hourly presence data for heat map
+  fastify.get('/heatmap', async (request, reply) => {
+    const db = fastify.db;
+    const { days = '30' } = request.query as { days?: string };
+    const windowDays = Math.min(Math.max(parseInt(days, 10) || 30, 1), 90);
+    const windowStart = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    const now = new Date();
+
+    const devices = db.prepare(`SELECT id, name, vendor, ip, status FROM devices`).all() as any[];
+    const allRows = db.prepare(
+      `SELECT deviceId, status, timestamp FROM device_status_history WHERE timestamp >= ? ORDER BY deviceId, timestamp ASC`
+    ).all(windowStart.toISOString()) as { deviceId: string, status: string, timestamp: string }[];
+
+    // Group rows by deviceId
+    const byDevice: Record<string, { status: string, timestamp: string }[]> = {};
+    for (const row of allRows) {
+      if (!byDevice[row.deviceId]) byDevice[row.deviceId] = [];
+      byDevice[row.deviceId].push(row);
+    }
+
+    const aggregate = new Array(24).fill(0); // total online-minutes per hour across all devices
+    const aggregate_days = new Array(24).fill(0); // how many device-days contributed per hour
+
+    const deviceHeatmaps = devices.map((dev: any) => {
+      const hours = new Array(24).fill(0); // fraction 0.0–1.0 per hour (avg across windowDays)
+      const rows = byDevice[dev.id] || [];
+      const minutesOnline = new Array(24).fill(0); // accumulated online-minutes per hour bucket
+      const minutesTotal = windowDays * 60; // total minutes per hour bucket across the window
+
+      let lastOnline: Date | null = null;
+      for (const row of rows) {
+        const t = new Date(row.timestamp);
+        if (row.status === 'online') {
+          lastOnline = t;
+        } else if (row.status === 'offline' && lastOnline) {
+          // Walk through every minute of this interval and bucket by hour
+          accumulateInterval(lastOnline, t, minutesOnline);
+          lastOnline = null;
+        }
+      }
+      if (lastOnline && dev.status === 'online') {
+        accumulateInterval(lastOnline, now, minutesOnline);
+      }
+
+      for (let h = 0; h < 24; h++) {
+        hours[h] = minutesTotal > 0 ? Math.min(1, minutesOnline[h] / minutesTotal) : 0;
+        aggregate[h] += minutesOnline[h];
+        if (minutesOnline[h] > 0) aggregate_days[h] += 1;
+      }
+
+      return {
+        id: dev.id,
+        name: dev.name || dev.vendor || dev.ip,
+        ip: dev.ip,
+        hours,
+        hasHistory: rows.length > 0,
+      };
+    });
+
+    // Normalize aggregate to average devices online per hour
+    const windowMinutesPerHour = windowDays * 60;
+    const aggregateNorm = aggregate.map((m: number, h: number) => ({
+      hour: h,
+      avgMinutesOnline: m / Math.max(1, devices.length),
+      presenceFraction: windowMinutesPerHour > 0 ? Math.min(1, m / (devices.length * windowMinutesPerHour)) : 0,
+    }));
+
+    return { devices: deviceHeatmaps, aggregate: aggregateNorm, windowDays };
+  });
+
+  // GET /api/activity - Historical activity feed (from device_status_history)
+  fastify.get('/activity', async (request, reply) => {
+    const db = fastify.db;
+    const { days = '7' } = request.query as { days?: string };
+    const windowDays = Math.min(Math.max(parseInt(days, 10) || 7, 1), 30);
+    const windowStart = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+    // Join device_status_history with devices to get name/ip for display
+    const rows = db.prepare(`
+      SELECT dsh.id, dsh.deviceId, dsh.status, dsh.timestamp,
+             d.name, d.ip, d.vendor
+      FROM device_status_history dsh
+      LEFT JOIN devices d ON d.id = dsh.deviceId
+      WHERE dsh.timestamp >= ?
+      ORDER BY dsh.timestamp DESC
+      LIMIT 500
+    `).all(windowStart.toISOString()) as any[];
+
+    const events = rows.map((row: any) => {
+      const vendor = row.vendor && row.vendor !== 'Unknown' ? row.vendor : null;
+      const label = row.name && row.name !== row.ip ? row.name : (vendor ? `${row.ip} (${vendor})` : row.ip);
+      const type = row.status === 'online' ? 'device_online' : 'device_offline';
+      return {
+        id: row.id,
+        type,
+        timestamp: row.timestamp,
+        deviceId: row.deviceId,
+        deviceIp: row.ip,
+        deviceName: row.name,
+        message: type === 'device_online'
+          ? `${label} came back online`
+          : `${label} went offline`,
+      };
+    });
+
+    return events;
+  });
+}
+
+// Helper: accumulate online minutes into hour buckets
+function accumulateInterval(start: Date, end: Date, minutesOnline: number[]) {
+  let cur = new Date(start);
+  const endMs = end.getTime();
+  while (cur.getTime() < endMs) {
+    const h = cur.getUTCHours();
+    const nextHour = new Date(cur);
+    nextHour.setUTCHours(h + 1, 0, 0, 0);
+    const segEnd = nextHour.getTime() < endMs ? nextHour : end;
+    minutesOnline[h] += (segEnd.getTime() - cur.getTime()) / 60000;
+    cur = segEnd;
+  }
 }

@@ -31,9 +31,41 @@ export async function ingestRoutes(fastify: FastifyInstance) {
 
       // 1. Fetch current online devices
       const currentOnline = db.prepare(`SELECT id, name, vendor, ip FROM devices WHERE status = 'online'`).all() as { id: string, name: string | null, vendor: string | null, ip: string | null }[];
+      
+      // Merge IP-fallback records into recent MAC-based records
+      const sixtyFiveSecondsAgo = new Date(new Date(timestamp).getTime() - 65000).toISOString();
+      for (const device of devices) {
+        if (!device.mac) {
+          const recentMacDevice = db.prepare(`
+            SELECT id FROM devices 
+            WHERE ip = ? AND mac != '' AND lastSeen >= ?
+            ORDER BY lastSeen DESC LIMIT 1
+          `).get(device.ip, sixtyFiveSecondsAgo) as { id: string } | undefined;
+
+          if (recentMacDevice) {
+            device.id = recentMacDevice.id;
+          }
+        }
+      }
+
       const incomingIds = new Set(devices.map((d: any) => d.id));
 
-      // Check for offline devices
+      // Bootstrap: seed an initial 'online' row for any device that is currently online
+      // but has zero history records (e.g. devices that were already online before this
+      // feature was deployed). This is effectively a one-time migration — the INSERT is
+      // skipped on subsequent cycles because rows will already exist.
+      for (const onlineDevice of currentOnline) {
+        const hasHistory = db.prepare(
+          `SELECT id FROM device_status_history WHERE deviceId = ? LIMIT 1`
+        ).get(onlineDevice.id);
+        if (!hasHistory) {
+          db.prepare(`INSERT INTO device_status_history (id, deviceId, status, timestamp) VALUES (?, ?, 'online', ?)`)
+            .run(crypto.randomUUID(), onlineDevice.id, timestamp);
+        }
+      }
+
+      // Check for offline devices — write history AFTER merge, so IDs are always stable MAC-based IDs
+      const offlineEvents: { id: string, deviceId: string, ip: string | null, name: string | null }[] = [];
       for (const curr of currentOnline) {
         if (!incomingIds.has(curr.id)) {
           // Transitioned to offline
@@ -44,6 +76,10 @@ export async function ingestRoutes(fastify: FastifyInstance) {
           }
           createAlert('device_offline', 'warning', `${deviceIdentifier} went offline`, curr.id);
           db.prepare(`UPDATE devices SET status = 'offline' WHERE id = ?`).run(curr.id);
+          // Record transition in history
+          db.prepare(`INSERT INTO device_status_history (id, deviceId, status, timestamp) VALUES (?, ?, 'offline', ?)`)
+            .run(crypto.randomUUID(), curr.id, timestamp);
+          offlineEvents.push({ id: curr.id, deviceId: curr.id, ip: curr.ip, name: curr.name });
         }
       }
 
@@ -51,7 +87,7 @@ export async function ingestRoutes(fastify: FastifyInstance) {
         INSERT INTO devices (id, name, mac, ip, vendor, status, firstSeen, lastSeen, type, lastPingMs)
         VALUES (@id, @name, @mac, @ip, @vendor, @status, @firstSeen, @lastSeen, @type, @lastPingMs)
         ON CONFLICT(id) DO UPDATE SET
-          name = COALESCE(devices.name, excluded.name),
+          name = COALESCE(NULLIF(devices.name, ''), excluded.name),
           ip = excluded.ip,
           vendor = excluded.vendor,
           status = excluded.status,
@@ -65,16 +101,19 @@ export async function ingestRoutes(fastify: FastifyInstance) {
       let pingCount = 0;
       let lossCount = 0;
 
+      const onlineEvents: { deviceId: string, ip: string, name: string, vendor: string, isNew: boolean }[] = [];
+
       for (const device of devices) {
         // Check if new device (MAC or ID doesn't exist)
-        const exists = db.prepare(`SELECT id FROM devices WHERE id = ?`).get(device.id);
-        if (!exists) {
-          const nameOrVendor = device.name || device.vendor || '';
-          let deviceIdentifier = device.ip || 'Unknown IP';
-          if (nameOrVendor && nameOrVendor !== 'Unknown' && nameOrVendor !== device.ip) {
-            deviceIdentifier += ` (${nameOrVendor})`;
-          }
-          createAlert('new_device', 'info', `New device discovered: ${deviceIdentifier}`, device.id);
+        const existing = db.prepare(`SELECT id, status FROM devices WHERE id = ?`).get(device.id) as { id: string, status: string } | undefined;
+        const isNew = !existing;
+        const wasOffline = existing?.status === 'offline';
+
+        if (isNew) {
+          // Use IP as primary identifier, append vendor if known and not generic
+          const vendor = device.vendor && device.vendor !== 'Unknown' ? device.vendor : null;
+          const label = vendor ? `${device.ip} (${vendor})` : device.ip;
+          createAlert('new_device', 'info', `${label} joined the network for the first time`, device.id);
         }
 
         const deviceData = {
@@ -91,6 +130,13 @@ export async function ingestRoutes(fastify: FastifyInstance) {
         };
 
         upsertDevice.run(deviceData);
+
+        // Write history row for: new devices, and devices coming back online from offline
+        if (isNew || wasOffline) {
+          db.prepare(`INSERT INTO device_status_history (id, deviceId, status, timestamp) VALUES (?, ?, 'online', ?)`)
+            .run(crypto.randomUUID(), device.id, timestamp);
+          onlineEvents.push({ deviceId: device.id, ip: device.ip, name: device.name, vendor: device.vendor || '', isNew });
+        }
 
         // Per-device latency & packet loss alerts
         if (device.pingMs !== null && device.pingMs !== undefined) {
@@ -192,20 +238,49 @@ export async function ingestRoutes(fastify: FastifyInstance) {
         }
       }
       
-      return { metric: metricObj, newAlerts: generatedAlerts };
+      return { metric: metricObj, newAlerts: generatedAlerts, onlineEvents, offlineEvents };
     });
 
     try {
-      const { metric } = transaction();
+      const { metric, onlineEvents, offlineEvents } = transaction();
       // Fetch latest device list to broadcast
       const allDevices = db.prepare(`SELECT * FROM devices ORDER BY lastSeen DESC`).all();
       
-      // Emit socket.io event
+      // Emit socket.io network update
       fastify.io.emit('network:update', {
         timestamp,
         devices: allDevices,
         metrics: metric
       });
+
+      // Emit per-event activity feed events
+      for (const ev of offlineEvents) {
+        fastify.io.emit('activity:event', {
+          id: crypto.randomUUID(),
+          type: 'device_offline',
+          timestamp,
+          deviceId: ev.id,
+          deviceIp: ev.ip,
+          deviceName: ev.name,
+          message: `${ev.ip || 'Unknown'}${ev.name && ev.name !== ev.ip ? ` (${ev.name})` : ''} went offline`,
+        });
+      }
+
+      for (const ev of onlineEvents) {
+        const vendor = ev.vendor && ev.vendor !== 'Unknown' ? ev.vendor : null;
+        const label = vendor ? `${ev.ip} (${vendor})` : ev.ip;
+        fastify.io.emit('activity:event', {
+          id: crypto.randomUUID(),
+          type: ev.isNew ? 'new_device' : 'device_online',
+          timestamp,
+          deviceId: ev.deviceId,
+          deviceIp: ev.ip,
+          deviceName: ev.name,
+          message: ev.isNew
+            ? `${label} joined the network for the first time`
+            : `${label} came back online`,
+        });
+      }
 
       return reply.send({ success: true });
     } catch (err) {

@@ -23,6 +23,7 @@ export default function DevicesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [devices, setDevices] = useState<any[]>([]);
+  const [uptimeMap, setUptimeMap] = useState<Record<string, number | null>>({});
   const [search, setSearch] = useState(searchParams.get('q') || '');
 
   // Sync search from URL
@@ -49,6 +50,21 @@ export default function DevicesPage() {
       })
       .then(data => setDevices(data))
       .catch(console.error);
+    // Fetch 30d uptime data for all devices
+    fetch(`${backendUrl}/api/heatmap?days=30`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.devices) return;
+        const map: Record<string, number | null> = {};
+        for (const dev of data.devices) {
+          if (!dev.hasHistory) { map[dev.id] = null; continue; }
+          // Compute uptime from hourly presence: average fraction across 24 hours
+          const avg = dev.hours.reduce((s: number, v: number) => s + v, 0) / 24;
+          map[dev.id] = avg * 100;
+        }
+        setUptimeMap(map);
+      })
+      .catch(() => {});
   }, []);
 
   // Socket Live Updates
@@ -95,10 +111,11 @@ export default function DevicesPage() {
           <thead className="text-xs uppercase tracking-wider border-b border-border text-text-muted bg-surface-hover/30">
             <tr>
               <th className="px-6 py-4 font-medium">Device Name</th>
-              <th className="px-6 py-4 font-medium">IP & MAC</th>
+              <th className="px-6 py-4 font-medium">IP &amp; MAC</th>
               <th className="px-6 py-4 font-medium">Status</th>
               <th className="px-6 py-4 font-medium">Last Seen</th>
               <th className="px-6 py-4 font-medium text-right">Ping</th>
+              <th className="px-6 py-4 font-medium text-right">Uptime (30d)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -133,11 +150,20 @@ export default function DevicesPage() {
                 <td className="px-6 py-4 text-right">
                   {device.lastPingMs !== null && device.lastPingMs !== undefined ? `${Math.round(device.lastPingMs)} ms` : '--'}
                 </td>
+                <td className="px-6 py-4 text-right">
+                  {(() => {
+                    const pct = uptimeMap[device.id];
+                    if (pct === undefined) return <span className="text-text-muted">—</span>;
+                    if (pct === null) return <span className="text-text-muted text-xs">no data</span>;
+                    const color = pct >= 90 ? 'text-emerald-400' : pct >= 70 ? 'text-amber-400' : 'text-red-400';
+                    return <span className={`font-mono font-medium ${color}`}>{pct.toFixed(1)}%</span>;
+                  })()}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-text-muted">
+                <td colSpan={6} className="px-6 py-8 text-center text-text-muted">
                   No devices found.
                 </td>
               </tr>

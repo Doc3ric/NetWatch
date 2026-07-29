@@ -92,4 +92,21 @@ export function setupSchema(db: Database) {
   
   // Initialize default settings row if it doesn't exist
   db.exec(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
+
+  // ── Device Status History Table ──────────────────────────────────────────
+  // Records every online↔offline transition per device.
+  // Used for uptime % calculation and the heat map view.
+  // Written in ingest.ts AFTER the MAC/IP merge step, so IDs are always stable.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS device_status_history (
+      id       TEXT PRIMARY KEY,
+      deviceId TEXT NOT NULL,
+      status   TEXT NOT NULL CHECK(status IN ('online', 'offline')),
+      timestamp TEXT NOT NULL,
+      FOREIGN KEY (deviceId) REFERENCES devices(id) ON DELETE CASCADE
+    );
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_dsh_deviceId  ON device_status_history(deviceId);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_dsh_timestamp ON device_status_history(timestamp);`);
 }

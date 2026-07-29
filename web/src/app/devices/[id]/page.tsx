@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Edit2, Check, Laptop, Router } from 'lucide-react';
+import { ArrowLeft, Edit2, Check, Laptop, Router, Wifi, WifiOff } from 'lucide-react';
 import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function DeviceDetailPage() {
   const params = useParams();
@@ -11,10 +12,16 @@ export default function DeviceDetailPage() {
   const [device, setDevice] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
+  const [toast, setToast] = useState<{ message: string, visible: boolean } | null>(null);
+  const [uptime, setUptime] = useState<{ uptimePct: number | null, hasHistory: boolean } | null>(null);
+
+  const showToast = (message: string) => {
+    setToast({ message, visible: true });
+    setTimeout(() => setToast({ message, visible: false }), 3000);
+  };
 
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-    // For now, fetch all devices and find the one. Phase 8 can add a specific endpoint if needed.
     fetch(`${backendUrl}/api/devices`, { credentials: 'include' })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -28,12 +35,38 @@ export default function DeviceDetailPage() {
         }
       })
       .catch(console.error);
+
+    // Fetch uptime data for this device
+    fetch(`${backendUrl}/api/devices/${id}/uptime?days=30`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setUptime({ uptimePct: d.uptimePct, hasHistory: d.hasHistory }))
+      .catch(() => {});
   }, [id]);
 
-  const saveName = () => {
-    // In Phase 8 this will PUT to the backend. For now just update local state.
-    setDevice({ ...device, name: editName });
-    setIsEditing(false);
+  const saveName = async () => {
+    if (!editName.trim()) {
+      setIsEditing(false);
+      return;
+    }
+    
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+      const res = await fetch(`${backendUrl}/api/devices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: editName })
+      });
+      
+      if (!res.ok) throw new Error('Failed to save device name');
+      
+      setDevice({ ...device, name: editName });
+      setIsEditing(false);
+      showToast('Device renamed');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to rename device');
+    }
   };
 
   if (!device) return <div className="p-12 text-center text-text-muted animate-pulse">Loading device details...</div>;
@@ -96,6 +129,14 @@ export default function DeviceDetailPage() {
         </div>
       </div>
 
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 bg-surface border border-border text-text px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-opacity duration-300 ${toast.visible ? 'opacity-100' : 'opacity-0'}`}>
+          <Check className="w-5 h-5 text-primary" />
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-6">
         <div className="bg-surface border border-border rounded-xl p-6">
           <h2 className="text-sm font-semibold tracking-wider text-text-muted uppercase mb-4">First Seen</h2>
@@ -107,9 +148,59 @@ export default function DeviceDetailPage() {
         </div>
       </div>
       
-      {/* Usage chart placeholder */}
-      <div className="bg-surface border border-border rounded-xl p-6 h-64 flex flex-col justify-center items-center text-text-muted">
-         <p>Detailed per-device bandwidth usage chart will be implemented in Phase 5.</p>
+      {/* Uptime Section */}
+      <div className="bg-surface border border-border rounded-xl p-6">
+        <h2 className="text-sm font-semibold tracking-wider text-text-muted uppercase mb-5">Uptime (Last 30 Days)</h2>
+        {!uptime?.hasHistory ? (
+          <div className="flex flex-col items-center justify-center py-6 text-text-muted gap-2">
+            <div className="w-16 h-16 rounded-full border-4 border-border flex items-center justify-center">
+              <span className="text-xl font-bold text-text-muted">—</span>
+            </div>
+            <p className="text-sm">Accumulating data...</p>
+            <p className="text-xs text-text-muted/60">Uptime tracking began when this version was deployed.</p>
+          </div>
+        ) : (() => {
+          const pct = uptime?.uptimePct ?? 0;
+          const color = pct >= 90 ? '#34d399' : pct >= 70 ? '#fbbf24' : '#f87171';
+          const circumference = 2 * Math.PI * 36;
+          const dashOffset = circumference * (1 - pct / 100);
+          return (
+            <div className="flex flex-col sm:flex-row items-center gap-8">
+              {/* Circular gauge */}
+              <div className="relative shrink-0">
+                <svg width="96" height="96" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="36" fill="none" stroke="currentColor" strokeWidth="8" className="text-border" />
+                  <circle
+                    cx="48" cy="48" r="36" fill="none" stroke={color} strokeWidth="8"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={dashOffset}
+                    strokeLinecap="round"
+                    transform="rotate(-90 48 48)"
+                    style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xl font-bold" style={{ color }}>{pct.toFixed(1)}%</span>
+                </div>
+              </div>
+              {/* Stats */}
+              <div className="space-y-3 flex-1">
+                <div className="flex items-center gap-3">
+                  {device.status === 'online'
+                    ? <Wifi className="w-4 h-4 text-emerald-400" />
+                    : <WifiOff className="w-4 h-4 text-orange-400" />}
+                  <span className="text-sm">
+                    Currently <span className={device.status === 'online' ? 'text-emerald-400 font-medium' : 'text-orange-400 font-medium'}>{device.status}</span>
+                  </span>
+                </div>
+                <div className="text-sm text-text-muted">
+                  Last seen {device.lastSeen ? formatDistanceToNow(new Date(device.lastSeen), { addSuffix: true }) : 'never'}
+                </div>
+                <div className="text-xs text-text-muted/60">30-day window · transitions tracked since deploy</div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
     </div>

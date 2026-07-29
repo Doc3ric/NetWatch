@@ -19,11 +19,16 @@ export function startRetentionJob(fastify: FastifyInstance) {
       `).run(`-${metricsRetentionDays} days`);
 
       const alertsInfo = db.prepare(`
-        DELETE FROM alerts 
+        DELETE FROM alerts
         WHERE resolved = 1 AND timestamp < datetime('now', ?)
       `).run(`-${alertsRetentionDays} days`);
 
-      fastify.log.info(`[retention] Pruned ${metricsInfo.changes} old metrics rows and ${alertsInfo.changes} old resolved alerts.`);
+      const historyInfo = db.prepare(`
+        DELETE FROM device_status_history
+        WHERE timestamp < datetime('now', ?)
+      `).run(`-${metricsRetentionDays} days`);
+
+      fastify.log.info(`[retention] Pruned ${metricsInfo.changes} old metrics rows, ${alertsInfo.changes} old resolved alerts, ${historyInfo.changes} old device history rows.`);
     } catch (err) {
       fastify.log.error(`[retention] Failed to run prune job: ${err}`);
     }
